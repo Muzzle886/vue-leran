@@ -1,14 +1,16 @@
-import type { VNode } from "./types";
+import type { VNode, Component } from "./types";
 
-function MyComponent(): VNode {
-  return {
-    tag: "div",
-    props: {
-      onClick: () => alert("click me"),
-    },
-    children: "click me",
-  };
-}
+const MyComponent: Component = {
+  render() {
+    return {
+      tag: "div",
+      props: {
+        onClick: () => alert("click me"),
+      },
+      children: "click me",
+    };
+  },
+};
 
 const vnode: VNode = {
   tag: MyComponent,
@@ -18,7 +20,7 @@ function renderer(vnode: VNode, container: Element | null) {
   if (typeof vnode.tag === "string") {
     // 说明vnode描述的是标签元素
     mountElement(vnode, container);
-  } else if (typeof vnode.tag === "function") {
+  } else if (typeof vnode.tag === "object") {
     // 说明vnode描述的是组件
     mountComponent(vnode, container);
   }
@@ -53,11 +55,8 @@ function mountElement(vnode: VNode, container: Element | null) {
 }
 
 function mountComponent(vnode: VNode, container: Element | null) {
-  // 原写法 const subtree = vnode.tag();
-  // 由于需要类型断言，改为这样写
   // 调用组件函数，获取组件要渲染的内容（虚拟DOM）
-  const tag = vnode.tag as Function
-  const subtree = tag();
+  const subtree = (vnode.tag as Component).render()
   renderer(subtree, container);
 }
 
