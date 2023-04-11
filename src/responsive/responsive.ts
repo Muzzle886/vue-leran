@@ -21,23 +21,7 @@ const data: { [key: string | symbol]: string } = { text: "hello world" };
 const obj = new Proxy(data, {
   // 拦截读取操作
   get(target, key) {
-    // 如果没有activeEffect，直接return
-    if (!activeEffect) return;
-    // 根据target从桶中取得despMap，他也是一个Map类型：key-->effects
-    let depsMap = bucket.get(target);
-    // 如果不存在despMap，那么新建一个Map并与target关联
-    if (!depsMap) {
-      bucket.set(target, (depsMap = new Map<string | symbol, Set<Function>>()));
-    }
-    // 在根据key从depsMap中取得deps，他是一个Set类型
-    // 里面存储着所有与当前key相关联的副作用函数：effects
-    let deps = depsMap.get(key);
-    if (!deps) {
-      depsMap.set(key, (deps = new Set<Function>()));
-    }
-    // 最后将当前激活的副作用函数添加到桶里
-    deps.add(activeEffect);
-
+    track(target, key);
     // 返回属性值
     return target[key];
   },
@@ -45,17 +29,40 @@ const obj = new Proxy(data, {
   set(target, key, newValue) {
     // 设置属性值
     target[key] = newValue;
-    // 根据target从桶中取得despMap，他是key-->target
-    const depsMap = bucket.get(target);
-    if (!depsMap) return;
-    // 根据key取得所有副作用函数effects
-    const effects = depsMap.get(key);
-    // 执行副作用函数
-    effects && effects.forEach((fn) => fn());
+    trigger(target, key);
     // 返回true代表操作成功
     return true;
   },
 });
+
+function track(target: object, key: string | symbol) {
+  // 如果没有activeEffect，直接return
+  if (!activeEffect) return;
+  // 根据target从桶中取得despMap，他也是一个Map类型：key-->effects
+  let depsMap = bucket.get(target);
+  // 如果不存在despMap，那么新建一个Map并与target关联
+  if (!depsMap) {
+    bucket.set(target, (depsMap = new Map<string | symbol, Set<Function>>()));
+  }
+  // 在根据key从depsMap中取得deps，他是一个Set类型
+  // 里面存储着所有与当前key相关联的副作用函数：effects
+  let deps = depsMap.get(key);
+  if (!deps) {
+    depsMap.set(key, (deps = new Set<Function>()));
+  }
+  // 最后将当前激活的副作用函数添加到桶里
+  deps.add(activeEffect);
+}
+
+function trigger(target: object, key: string | symbol) {
+  // 根据target从桶中取得despMap，他是key-->target
+  const depsMap = bucket.get(target);
+  if (!depsMap) return;
+  // 根据key取得所有副作用函数effects
+  const effects = depsMap.get(key);
+  // 执行副作用函数
+  effects && effects.forEach((fn) => fn());
+}
 
 effect(
   // 匿名副作用函数
