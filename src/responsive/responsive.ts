@@ -1,5 +1,10 @@
 /**
- * 封装
+ * 分支切换与cleanup
+ * 在这个示例中，副作用函数有一个三元表达式，当字段obj.ok的值发生变化时，代码执行的分支会跟着变换，这就是所谓的分支切换
+ * 当我们把obj.ok的值修改为false时，理想状态下无论obj.text的值如何变化，我们都不需要重新执行副作用函数
+ * 但事实并非如此，如果我们再次修改obj.text的值，仍然会导致副作用函数执行
+ * 在示例运行1s后ok将会被修改为false，2s会再次修改text
+ * 理想状态应该为执行两次副作用函数，实际为3次
  */
 
 // 用一个全局变量存储被注册的副作用函数
@@ -16,7 +21,7 @@ function effect(fn: Function) {
 const bucket = new WeakMap<object, Map<string | symbol, Set<Function>>>();
 
 // 原始数据
-const data: { [key: string | symbol]: string } = { text: "hello world" };
+const data: { [key: string | symbol]: any } = { ok: true, text: "hello world" };
 // 对原始数据进行代理操作
 const obj = new Proxy(data, {
   // 拦截读取操作
@@ -68,12 +73,14 @@ effect(
   // 匿名副作用函数
   () => {
     console.log("effect run"); // 改进后只打印一次
-    document.querySelector(".responsive").innerHTML = obj.text;
+    document.querySelector(".responsive").innerHTML = obj.ok ? obj.text : "not";
   }
 );
 setTimeout(() => {
-  // 副作用函数中并没有读取notExist属性的值
-  obj.notExist = "hello vue3";
+  obj.ok = false;
 }, 1000);
+setTimeout(() => {
+  obj.text = "hello vue3";
+}, 2000);
 
 export default {};
