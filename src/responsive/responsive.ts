@@ -60,7 +60,7 @@ const obj = new Proxy(data, {
 effect(
   // 匿名副作用函数
   () => {
-    console.log("effect run"); // 会打印两次
+    console.log("effect run"); // 改进后只打印一次
     document.querySelector(".responsive").innerHTML = obj.text;
   }
 );
