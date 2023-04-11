@@ -1,3 +1,11 @@
+// 用一个全局变量存储被注册的副作用函数
+let activeEffect: Function;
+// effect函数用于注册副作用函数
+function effect(fn: Function) {
+  activeEffect = fn;
+  fn();
+}
+
 // 存储副作用函数的桶
 const bucket = new Set<Function>();
 
@@ -8,7 +16,9 @@ const obj = new Proxy(data, {
   // 拦截读取操作
   get(target, key) {
     // 将副作用函数effect添加到储存副作用函数的桶中
-    bucket.add(effect);
+    if (activeEffect) {
+      bucket.add(activeEffect);
+    }
     // 返回属性值
     return target[key];
   },
@@ -23,12 +33,9 @@ const obj = new Proxy(data, {
   },
 });
 
-// 副作用函数
-function effect() {
-  document.querySelector('.responsive').innerHTML = obj.text;
-}
-
-effect();
+effect(() => {
+  document.querySelector(".responsive").innerHTML = obj.text;
+});
 setTimeout(() => {
   obj.text = "hello vue3";
 }, 1000);
