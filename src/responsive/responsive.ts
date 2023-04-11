@@ -1,20 +1,35 @@
 /**
  * 分支切换与cleanup
- * 在这个示例中，副作用函数有一个三元表达式，当字段obj.ok的值发生变化时，代码执行的分支会跟着变换，这就是所谓的分支切换
- * 当我们把obj.ok的值修改为false时，理想状态下无论obj.text的值如何变化，我们都不需要重新执行副作用函数
- * 但事实并非如此，如果我们再次修改obj.text的值，仍然会导致副作用函数执行
- * 在示例运行1s后ok将会被修改为false，2s会再次修改text
- * 理想状态应该为执行两次副作用函数，实际为3次
+ * 解决思路：每次执行副作用函数时，我们可以先把它所有与之关联的依赖中删除
  */
 
+import type { EffectFunction } from "./tyeps";
+
 // 用一个全局变量存储被注册的副作用函数
-let activeEffect: Function;
+let activeEffect: EffectFunction;
 // effect函数用于注册副作用函数
 function effect(fn: Function) {
-  // 当调用effect注册副作用函数时，将副作用函数fn赋值给activeEffect
-  activeEffect = fn;
-  // 执行副作用函数
-  fn();
+  const effectFn = () => {
+    // 调用clenup函数完成清除工作
+    cleanup(effectFn);
+    // 当调用effect注册副作用函数时，将副作用函数fn赋值给activeEffect
+    activeEffect = effectFn;
+    // 执行副作用函数
+    fn();
+  };
+  // activeEffect.deps用来存储所有与该副作用函数相关联的依赖集合
+  effectFn.deps = new Array<Set<Function>>();
+  effectFn();
+}
+
+function cleanup(effectFn: EffectFunction) {
+  // 遍历effectFn.deps数组
+  for (const deps of effectFn.deps) {
+    // 将effectFn从依赖集合中移除
+    deps.delete(effectFn);
+  }
+  // 最后需要重制effectFn.deps数组
+  effectFn.deps.length = 0;
 }
 
 // 存储副作用函数的桶
@@ -55,8 +70,11 @@ function track(target: object, key: string | symbol) {
   if (!deps) {
     depsMap.set(key, (deps = new Set<Function>()));
   }
-  // 最后将当前激活的副作用函数添加到桶里
+  // 把当前激活的副作用函数添加到依赖集合deps中
   deps.add(activeEffect);
+  // deps就是一个与当前副作用函数存在联系的依赖集合
+  // 将其添加到activeEffect.deps数组中
+  activeEffect.deps.push(deps);
 }
 
 function trigger(target: object, key: string | symbol) {
@@ -66,13 +84,20 @@ function trigger(target: object, key: string | symbol) {
   // 根据key取得所有副作用函数effects
   const effects = depsMap.get(key);
   // 执行副作用函数
-  effects && effects.forEach((fn) => fn());
+  /**
+   * 这种方式会导致无限循环
+   * 在调用forEach遍历set集合时，如果一个值已经被访问过了，但该值被删除并重新添加到集合，如果此时forEach遍历没有结束，那么该值会被重新访问
+   */
+  // effects && effects.forEach((fn) => fn());
+  // 解决方法
+  const effectsToRun = new Set(effects);
+  effectsToRun.forEach((fn) => fn());
 }
 
 effect(
   // 匿名副作用函数
   () => {
-    console.log("effect run"); // 改进后只打印一次
+    console.log("effect run");
     document.querySelector(".responsive").innerHTML = obj.ok ? obj.text : "not";
   }
 );
