@@ -1,12 +1,13 @@
 /**
- * 分支切换与cleanup
- * 解决思路：每次执行副作用函数时，我们可以先把它所有与之关联的依赖中删除
+ * 嵌套的effect与effect栈
  */
 
 import type { EffectFunction } from "./tyeps";
 
 // 用一个全局变量存储被注册的副作用函数
 let activeEffect: EffectFunction;
+// effect栈
+const effectStack: Array<Function> = [];
 // effect函数用于注册副作用函数
 function effect(fn: Function) {
   const effectFn = () => {
@@ -14,8 +15,13 @@ function effect(fn: Function) {
     cleanup(effectFn);
     // 当调用effect注册副作用函数时，将副作用函数fn赋值给activeEffect
     activeEffect = effectFn;
+    // 在调用副作用函数前将当前副作用函数压入栈中
+    effectStack.push(effectFn);
     // 执行副作用函数
     fn();
+    // 在副作用函数执行完成后，将当前副作用函数弹出栈，并把activeEffect还原为之前的值
+    effectStack.pop();
+    activeEffect = effectStack[effectStack.length - 1];
   };
   // activeEffect.deps用来存储所有与该副作用函数相关联的依赖集合
   effectFn.deps = new Array<Set<Function>>();
@@ -107,5 +113,3 @@ setTimeout(() => {
 setTimeout(() => {
   obj.text = "hello vue3";
 }, 2000);
-
-export default {};
