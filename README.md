@@ -1,15 +1,3 @@
-# 🚀 Welcome to your new awesome project!
+# Vue.js学习记录
 
-This project has been created using **webpack-cli**, you can now run
-
-```
-npm run build
-```
-
-or
-
-```
-yarn build
-```
-
-to bundle your application
+这个项目是深入学习Vue框架的一些记录，将跟随《Vue.js设计与实现》 霍春阳 著，从框架设计到实现，慢慢实现Vue的一些功能，便于深入理解Vue框架
