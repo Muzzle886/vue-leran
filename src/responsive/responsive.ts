@@ -1,6 +1,5 @@
 /**
- * 此版本主要对响应式系统进行测试，在响应式数据obj上设置一个不存在的属性
- * 我们没有在副作用函数与被操作的目标字段之间建立明确的联系，导致我们没有读取text属性但是副作用函数依旧被执行了，这是不正确的
+ * 根据上次测试的结果进行改进，引入weakMap
  */
 
 // 用一个全局变量存储被注册的副作用函数
@@ -14,7 +13,7 @@ function effect(fn: Function) {
 }
 
 // 存储副作用函数的桶
-const bucket = new Set<Function>();
+const bucket = new WeakMap<object, Map<string | symbol, Set<Function>>>();
 
 // 原始数据
 const data: { [key: string | symbol]: string } = { text: "hello world" };
@@ -22,10 +21,23 @@ const data: { [key: string | symbol]: string } = { text: "hello world" };
 const obj = new Proxy(data, {
   // 拦截读取操作
   get(target, key) {
-    // 将副作用函数effect添加到储存副作用函数的桶中
-    if (activeEffect) {
-      bucket.add(activeEffect);
+    // 如果没有activeEffect，直接return
+    if (!activeEffect) return;
+    // 根据target从桶中取得despMap，他也是一个Map类型：key-->effects
+    let depsMap = bucket.get(target);
+    // 如果不存在despMap，那么新建一个Map并与target关联
+    if (!depsMap) {
+      bucket.set(target, (depsMap = new Map<string | symbol, Set<Function>>()));
     }
+    // 在根据key从depsMap中取得deps，他是一个Set类型
+    // 里面存储着所有与当前key相关联的副作用函数：effects
+    let deps = depsMap.get(key);
+    if (!deps) {
+      depsMap.set(key, (deps = new Set<Function>()));
+    }
+    // 最后将当前激活的副作用函数添加到桶里
+    deps.add(activeEffect);
+
     // 返回属性值
     return target[key];
   },
@@ -33,8 +45,13 @@ const obj = new Proxy(data, {
   set(target, key, newValue) {
     // 设置属性值
     target[key] = newValue;
-    // 把副作用函数从桶里取出并执行
-    bucket.forEach((fn) => fn());
+    // 根据target从桶中取得despMap，他是key-->target
+    const depsMap = bucket.get(target);
+    if (!depsMap) return;
+    // 根据key取得所有副作用函数effects
+    const effects = depsMap.get(key);
+    // 执行副作用函数
+    effects && effects.forEach((fn) => fn());
     // 返回true代表操作成功
     return true;
   },
@@ -43,7 +60,7 @@ const obj = new Proxy(data, {
 effect(
   // 匿名副作用函数
   () => {
-    console.log('effect run'); // 会打印两次
+    console.log("effect run"); // 会打印两次
     document.querySelector(".responsive").innerHTML = obj.text;
   }
 );
