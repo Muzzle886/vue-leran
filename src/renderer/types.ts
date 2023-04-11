@@ -1,5 +1,5 @@
 export interface VNode {
-  tag: string;
-  props: any;
-  children: string | VNode[];
+  tag?: string|Function;
+  props?: any;
+  children?: string | VNode[];
 }
