@@ -1,15 +1,15 @@
 /**
- * 调度执行
+ * lazy
  */
 
-import type { EffectFunction } from "./tyeps";
+import type { EffectFunction, Options } from "./tyeps";
 
 // 用一个全局变量存储被注册的副作用函数
 let activeEffect: EffectFunction;
 // effect栈
 const effectStack: Array<Function> = [];
 // effect函数用于注册副作用函数
-function effect(fn: Function, options?: { scheduler: Function }) {
+function effect(fn: Function, options?: Options) {
   const effectFn: EffectFunction = () => {
     // 调用clenup函数完成清除工作
     cleanup(effectFn);
@@ -18,16 +18,24 @@ function effect(fn: Function, options?: { scheduler: Function }) {
     // 在调用副作用函数前将当前副作用函数压入栈中
     effectStack.push(effectFn);
     // 执行副作用函数
-    fn();
+    // 将fn的执行结果存储到res中
+    const result = fn();
     // 在副作用函数执行完成后，将当前副作用函数弹出栈，并把activeEffect还原为之前的值
     effectStack.pop();
     activeEffect = effectStack[effectStack.length - 1];
+    // 返回函数执行结果，实现getter功能
+    return result;
   };
   // 将options挂载到effectFn上
   effectFn.options = options;
   // activeEffect.deps用来存储所有与该副作用函数相关联的依赖集合
   effectFn.deps = new Array<Set<Function>>();
-  effectFn();
+  // 只有非lazy的时候才立即执行
+  if (!options.lazy) {
+    effectFn();
+  }
+  // 将副作用函数作为返回值
+  return effectFn;
 }
 
 function cleanup(effectFn: EffectFunction) {
@@ -101,14 +109,17 @@ function trigger(target: object, key: string | symbol) {
   const effectsToRun = new Set<EffectFunction>();
   effects &&
     effects.forEach((effectFn) => {
+      // 如果trigger触发执行的副作用函数与当前正在执行的副作用函数相同，则不触发执行
       if (effectFn !== activeEffect) {
         effectsToRun.add(effectFn);
       }
     });
   effectsToRun.forEach((effectFn) => {
+    // 如果一个副作用函数存在调度器，则调用该调度器，并将副作用函数作为参数传递
     if (effectFn.options.scheduler) {
       effectFn.options.scheduler(effectFn);
     } else {
+      // 否则直接执行副作用函数
       effectFn();
     }
   });
