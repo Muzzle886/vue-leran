@@ -125,6 +125,18 @@ function trigger(target: object, key: string | symbol) {
   });
 }
 
+function computed(getter: Function) {
+  // 把getter作为副作用函数，创建一个lazy的effect
+  const effectFn = effect(getter, { lazy: true });
+  const obj = {
+    // 当读取value时才执行effectFn
+    get value() {
+      return effectFn();
+    },
+  };
+  return obj;
+}
+
 effect(
   // 匿名副作用函数
   () => {
