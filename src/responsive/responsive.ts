@@ -1,5 +1,5 @@
 /**
- * 嵌套的effect与effect栈
+ * 避免无限递归调用
  */
 
 import type { EffectFunction } from "./tyeps";
@@ -10,7 +10,7 @@ let activeEffect: EffectFunction;
 const effectStack: Array<Function> = [];
 // effect函数用于注册副作用函数
 function effect(fn: Function) {
-  const effectFn = () => {
+  const effectFn: EffectFunction = () => {
     // 调用clenup函数完成清除工作
     cleanup(effectFn);
     // 当调用effect注册副作用函数时，将副作用函数fn赋值给activeEffect
@@ -96,7 +96,13 @@ function trigger(target: object, key: string | symbol) {
    */
   // effects && effects.forEach((fn) => fn());
   // 解决方法
-  const effectsToRun = new Set(effects);
+  const effectsToRun = new Set<Function>();
+  effects &&
+    effects.forEach((fn) => {
+      if (fn !== activeEffect) {
+        effectsToRun.add(fn);
+      }
+    });
   effectsToRun.forEach((fn) => fn());
 }
 
