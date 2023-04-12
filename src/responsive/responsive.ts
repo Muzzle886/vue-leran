@@ -1,5 +1,5 @@
 /**
- * 避免无限递归调用
+ * 调度执行
  */
 
 import type { EffectFunction } from "./tyeps";
@@ -9,7 +9,7 @@ let activeEffect: EffectFunction;
 // effect栈
 const effectStack: Array<Function> = [];
 // effect函数用于注册副作用函数
-function effect(fn: Function) {
+function effect(fn: Function, options?: { scheduler: Function }) {
   const effectFn: EffectFunction = () => {
     // 调用clenup函数完成清除工作
     cleanup(effectFn);
@@ -23,6 +23,8 @@ function effect(fn: Function) {
     effectStack.pop();
     activeEffect = effectStack[effectStack.length - 1];
   };
+  // 将options挂载到effectFn上
+  effectFn.options = options;
   // activeEffect.deps用来存储所有与该副作用函数相关联的依赖集合
   effectFn.deps = new Array<Set<Function>>();
   effectFn();
@@ -96,14 +98,20 @@ function trigger(target: object, key: string | symbol) {
    */
   // effects && effects.forEach((fn) => fn());
   // 解决方法
-  const effectsToRun = new Set<Function>();
+  const effectsToRun = new Set<EffectFunction>();
   effects &&
-    effects.forEach((fn) => {
-      if (fn !== activeEffect) {
-        effectsToRun.add(fn);
+    effects.forEach((effectFn) => {
+      if (effectFn !== activeEffect) {
+        effectsToRun.add(effectFn);
       }
     });
-  effectsToRun.forEach((fn) => fn());
+  effectsToRun.forEach((effectFn) => {
+    if (effectFn.options.scheduler) {
+      effectFn.options.scheduler(effectFn);
+    } else {
+      effectFn();
+    }
+  });
 }
 
 effect(
