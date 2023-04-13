@@ -9,7 +9,7 @@ let activeEffect: EffectFunction;
 // effect栈
 const effectStack: Array<Function> = [];
 // effect函数用于注册副作用函数
-function effect(fn: Function, options?: Options) {
+function effect(fn: Function, options: Options = {}) {
   const effectFn: EffectFunction = () => {
     // 调用clenup函数完成清除工作
     cleanup(effectFn);
@@ -52,7 +52,12 @@ function cleanup(effectFn: EffectFunction) {
 const bucket = new WeakMap<object, Map<string | symbol, Set<Function>>>();
 
 // 原始数据
-const data: { [key: string | symbol]: any } = { ok: true, text: "hello world" };
+const data: { [key: string | symbol]: any } = {
+  ok: true,
+  text: "hello world",
+  foo: 1,
+  bar: 2,
+};
 // 对原始数据进行代理操作
 const obj = new Proxy(data, {
   // 拦截读取操作
@@ -126,27 +131,50 @@ function trigger(target: object, key: string | symbol) {
 }
 
 function computed(getter: Function) {
+  // vlaue用来缓存上一次计算的值
+  let value: any;
+  // dirty标志，用来标志数据是否需要重新计算值
+  let dirty = true;
   // 把getter作为副作用函数，创建一个lazy的effect
-  const effectFn = effect(getter, { lazy: true });
+  const effectFn = effect(getter, {
+    lazy: true,
+    scheduler() {
+      dirty = true;
+      trigger(obj, "value");
+    },
+  });
   const obj = {
     // 当读取value时才执行effectFn
     get value() {
-      return effectFn();
+      if (dirty) {
+        value = effectFn();
+        dirty = false;
+      }
+      track(obj, "value");
+      return value;
     },
   };
   return obj;
 }
 
-effect(
-  // 匿名副作用函数
-  () => {
-    console.log("effect run");
-    document.querySelector(".responsive").innerHTML = obj.ok ? obj.text : "not";
-  }
-);
-setTimeout(() => {
-  obj.ok = false;
-}, 1000);
-setTimeout(() => {
-  obj.text = "hello vue3";
-}, 2000);
+// effect(
+//   // 匿名副作用函数
+//   () => {
+//     console.log("effect run");
+//     document.querySelector(".responsive").innerHTML = obj.ok ? obj.text : "not";
+//   }
+// );
+// setTimeout(() => {
+//   obj.ok = false;
+// }, 1000);
+// setTimeout(() => {
+//   obj.text = "hello vue3";
+// }, 2000);
+const sumRes = computed(() => obj.foo + obj.bar);
+effect(() => {
+  console.log(sumRes.value);
+});
+// console.log(sumRes.value);
+// console.log(sumRes.value);
+obj.foo++;
+// console.log(sumRes.value);
