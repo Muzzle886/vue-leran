@@ -157,6 +157,34 @@ function computed(getter: Function) {
   return obj;
 }
 
+function watch(source: any, callback: Function) {
+  let getter: Function;
+  if (typeof source === "function") {
+    getter = source;
+  } else {
+    getter = () => traverse(source);
+  }
+  let oldValue: any, newValue: any;
+  const effectFn = effect(() => getter(), {
+    lazy: true,
+    scheduler(effectFn) {
+      newValue = effectFn();
+      callback(newValue, oldValue);
+      oldValue = newValue;
+    },
+  });
+  oldValue = effectFn();
+}
+
+function traverse(value: any, seen = new Set()) {
+  if (typeof value !== "object" || value === null || seen.has(value)) return;
+  seen.add(value);
+  for (const k in value) {
+    traverse(value[k], seen);
+  }
+  return value;
+}
+
 // effect(
 //   // 匿名副作用函数
 //   () => {
