@@ -57,15 +57,17 @@ const data: { [key: string | symbol]: any } = {
 // 对原始数据进行代理操作
 const obj = new Proxy(data, {
   // 拦截读取操作
-  get(target, key) {
+  get(target, key, receiver) {
     track(target, key)
     // 返回属性值
-    return target[key]
+    // return target[key]
+    return Reflect.get(target, key, receiver)
   },
   // 拦截设置操作
-  set(target, key, newValue) {
+  set(target, key, newValue, receiver) {
     // 设置属性值
-    target[key] = newValue
+    // target[key] = newValue
+    Reflect.set(target, key, newValue, receiver)
     trigger(target, key)
     // 返回true代表操作成功
     return true
